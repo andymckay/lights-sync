@@ -1,6 +1,7 @@
 from nanoleafapi import discovery, Nanoleaf, NanoleafDigitalTwin
 import requests
 from random import choice
+import time
 
 IP_ADDRESS = "192.168.42.8"
 URL = "https://kctbh9vrtdwd.statuspage.io/api/v2/components.json"
@@ -50,29 +51,41 @@ class Nano:
         "GitHub Pages": BOTTOM_PLUS_ONE,
         "API Requests": BOTTOM_PLUS_TWO,
         "GitHub Packages": LEFT,
-        "Codespaces": RIGHT
+        "Codespaces": RIGHT,
+        "Git Operations": TOP_MINUS_ONE,
+        "Issues": TOP,
     }
 
     def __init__(self, ip):
         self.nl = Nanoleaf(ip)
         self.twin = NanoleafDigitalTwin(self.nl)
-    
+        self.last = {}
+        self.nl.set_brightness(10)
+        self.needs_syncing = False
+
     def turn_on(self):
         if not self.nl.get_power():
             self.nl.toggle_power()
-    
+
     def turn_off(self):
         if self.nl.get_power():
             self.nl.toggle_power()
 
     def set(self, light, colour):
-        self.twin.set_color(light, colour)
-        self.twin.sync()
+        if (self.last.get(light, None) != colour):
+            self.twin.set_color(light, colour)
+            self.last[light] = colour
+            self.needs_syncing = True
+
+    def sync(self):
+        if self.needs_syncing:
+            self.twin.sync()
+            self.needs_syncing = False
 
     def set_all(self):
         for light in self.LIGHTS:
             self.twin.set_color(light, choice(self.COLOURS))
-        self.twin.sync()
+        self.needs_syncing = True
 
 
 class GitHubStatus:
@@ -88,11 +101,15 @@ class GitHubStatus:
         result = {}
         for component in res.json()["components"]:
             result[component["name"]] = self.lookup.get(component["status"], Nano.RED)
+
         return result
 
 if __name__ == '__main__':
     nl = Nano(IP_ADDRESS)
-    status = GitHubStatus()
-    for key, value in status.get().items():
-        if key in nl.MAPPING:
-            nl.set(nl.MAPPING[key], value)
+    while 1:
+        status = GitHubStatus()
+        for key, value in status.get().items():
+            if key in nl.MAPPING:
+                nl.set(nl.MAPPING[key], value)
+        time.sleep(120)
+        nl.sync()
