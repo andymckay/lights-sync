@@ -111,5 +111,6 @@ if __name__ == '__main__':
         for key, value in status.get().items():
             if key in nl.MAPPING:
                 nl.set(nl.MAPPING[key], value)
-        time.sleep(120)
         nl.sync()
+
+        time.sleep(120)
