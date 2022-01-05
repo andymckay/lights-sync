@@ -2,6 +2,8 @@ from nanoleafapi import discovery, Nanoleaf, NanoleafDigitalTwin
 import requests
 from random import choice
 import time
+import sys
+from datetime import datetime
 
 IP_ADDRESS = "192.168.42.8"
 URL = "https://kctbh9vrtdwd.statuspage.io/api/v2/components.json"
@@ -60,7 +62,7 @@ class Nano:
         self.nl = Nanoleaf(ip)
         self.twin = NanoleafDigitalTwin(self.nl)
         self.last = {}
-        self.nl.set_brightness(10)
+        self.nl.set_brightness(15)
         self.needs_syncing = False
 
     def turn_on(self):
@@ -93,24 +95,35 @@ class GitHubStatus:
         self.url = URL
         self.lookup = {
             "operational": Nano.GREEN,
+            "partial_outage": Nano.YELLOW,
         }
 
     def get(self):
         res = requests.get(self.url)
         res.raise_for_status()
         result = {}
+        print(datetime.now())
         for component in res.json()["components"]:
+            if "Visit" in component["name"]:
+                continue
+            print(component["name"], "is", component["status"])
             result[component["name"]] = self.lookup.get(component["status"], Nano.RED)
 
         return result
 
+def set_status():
+    for key, value in status.get().items():
+        if key in nl.MAPPING:
+            nl.set(nl.MAPPING[key], value)
+    nl.sync()
+
 if __name__ == '__main__':
     nl = Nano(IP_ADDRESS)
-    while 1:
-        status = GitHubStatus()
-        for key, value in status.get().items():
-            if key in nl.MAPPING:
-                nl.set(nl.MAPPING[key], value)
-        nl.sync()
+    status = GitHubStatus()
 
-        time.sleep(120)
+    if "--loop" in sys.argv:
+        while 1:
+            set_status()
+            time.sleep(120)
+    else:
+        set_status()
